@@ -20,75 +20,52 @@ def thermal(frame):
 
     gray = cv2.GaussianBlur(
         gray,
-        (5, 5),
+        (5,5),
         0
     )
 
-    thermal_img = cv2.applyColorMap(
+    return cv2.applyColorMap(
         gray,
         cv2.COLORMAP_INFERNO
     )
-
-    return thermal_img
 
 
 def tv_scan(frame):
 
     img = frame.copy()
 
-    h, w, _ = img.shape
+    h,w,_ = img.shape
 
-    for y in range(0, h, 4):
-        img[y:y+1, :] //= 2
+    for y in range(0,h,4):
+        img[y:y+1]//=2
 
-    b, g, r = cv2.split(img)
+    b,g,r = cv2.split(img)
 
-    r = np.roll(r, 3, axis=1)
-    b = np.roll(b, -3, axis=1)
+    r = np.roll(r,4,axis=1)
+    b = np.roll(b,-4,axis=1)
 
-    img = cv2.merge([b, g, r])
+    img = cv2.merge([b,g,r])
 
     noise = np.random.randint(
         0,
-        25,
+        30,
         img.shape,
         dtype=np.uint8
     )
 
-    img = cv2.add(img, noise)
+    img = cv2.add(img,noise)
 
     return img
 
 
-def invisibility(frame):
+def invisible_face(frame):
 
     global background
 
     if background is None:
         background = frame.copy()
 
-    hsv = cv2.cvtColor(
-        frame,
-        cv2.COLOR_BGR2HSV
-    )
-
-    lower_green = np.array([35, 40, 40])
-    upper_green = np.array([85, 255, 255])
-
-    mask = cv2.inRange(
-        hsv,
-        lower_green,
-        upper_green
-    )
-
     result = frame.copy()
-
-    result[mask > 0] = background[mask > 0]
-
-    return result
-
-
-def face_invisible(frame):
 
     gray = cv2.cvtColor(
         frame,
@@ -97,28 +74,47 @@ def face_invisible(frame):
 
     faces = face_cascade.detectMultiScale(
         gray,
-        scaleFactor=1.2,
-        minNeighbors=5
+        1.2,
+        5
     )
 
-    result = frame.copy()
+    for (x,y,w,h) in faces:
 
-    for (x, y, w, h) in faces:
+        if background.shape == frame.shape:
 
-        face = result[
-            y:y+h,
-            x:x+w
-        ]
+            face_bg = background[
+                y:y+h,
+                x:x+w
+            ]
 
-        blurred = cv2.GaussianBlur(
-            face,
-            (99, 99),
-            30
-        )
+            blur = cv2.GaussianBlur(
+                face_bg,
+                (21,21),
+                0
+            )
 
-        result[
-            y:y+h,
-            x:x+w
-        ] = blurred
+            result[
+                y:y+h,
+                x:x+w
+            ] = blur
 
     return result
+
+
+def blue_energy_layer(width,height):
+
+    img = np.zeros(
+        (height,width,3),
+        dtype=np.uint8
+    )
+
+    for y in range(height):
+
+        value = int(
+            255 *
+            (1 - y/height)
+        )
+
+        img[y,:,0] = value
+
+    return img

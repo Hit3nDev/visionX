@@ -8,9 +8,15 @@ tracker = HandTracker()
 
 cap = cv2.VideoCapture(0)
 
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-cap.set(cv2.CAP_PROP_FPS, 30)
+cap.set(
+    cv2.CAP_PROP_FRAME_WIDTH,
+    1280
+)
+
+cap.set(
+    cv2.CAP_PROP_FRAME_HEIGHT,
+    720
+)
 
 mode = 1
 
@@ -21,12 +27,12 @@ while True:
     if not ret:
         break
 
-    frame = cv2.flip(frame, 1)
+    frame = cv2.flip(frame,1)
 
     kernel = np.array([
-        [-1, -1, -1],
-        [-1,  9, -1],
-        [-1, -1, -1]
+        [-1,-1,-1],
+        [-1, 9,-1],
+        [-1,-1,-1]
     ])
 
     frame = cv2.filter2D(
@@ -35,23 +41,46 @@ while True:
         kernel
     )
 
-    corners = tracker.get_screen_points(frame)
+    hands = tracker.get_data(frame)
 
-    if mode == 1:
-        processed = thermal(frame)
+    if hands and len(hands) >= 2:
 
-    elif mode == 2:
-        processed = tv_scan(frame)
+        left = hands[0]
+        right = hands[1]
 
-    elif mode == 3:
-        processed = invisibility(frame)
+        mode_detected = tracker.detect_mode(
+            right
+        )
 
-    else:
-        processed = face_invisible(frame)
+        if mode_detected != 0:
+            mode = mode_detected
 
-    if corners is not None:
+        lt = left["index"]
+        lb = left["thumb"]
 
-        lt, rt, rb, lb = corners
+        rt = right["index"]
+        rb = right["thumb"]
+
+        width = int(
+            np.linalg.norm(
+                np.array(rt) -
+                np.array(lt)
+            )
+        )
+
+        height = max(
+            int(width*0.6),
+            200
+        )
+
+        if mode == 1:
+            processed = thermal(frame)
+
+        elif mode == 2:
+            processed = invisible_face(frame)
+
+        else:
+            processed = tv_scan(frame)
 
         pts = np.array(
             [
@@ -74,73 +103,69 @@ while True:
             255
         )
 
-        frame[mask == 255] = processed[mask == 255]
+        frame[mask==255] = \
+            processed[mask==255]
+
+        overlay = frame.copy()
 
         cv2.polylines(
-            frame,
+            overlay,
             [pts],
             True,
-            (255, 255, 255),
-            3
+            (255,255,255),
+            2
         )
 
-        for point in pts:
+        frame = cv2.addWeighted(
+            overlay,
+            0.85,
+            frame,
+            0.15,
+            0
+        )
 
-            cv2.circle(
-                frame,
-                tuple(point),
-                8,
-                (0, 255, 0),
-                -1
-            )
+        energy_height = 60
 
-    mode_text = {
-        1: "THERMAL",
-        2: "TV SCAN",
-        3: "INVISIBILITY",
-        4: "FACE INVISIBLE"
-    }
+        x = min(
+            lt[0],
+            lb[0],
+            rt[0],
+            rb[0]
+        )
 
-    cv2.putText(
-        frame,
-        mode_text[mode],
-        (20, 50),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1,
-        (0, 255, 0),
-        2
-    )
+        y = max(
+            lt[1],
+            rt[1]
+        )
 
-    cv2.putText(
-        frame,
-        "1 Thermal | 2 TV | 3 Invisible | 4 Face",
-        (20, 90),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (255, 255, 255),
-        2
-    )
+        x2 = max(
+            lt[0],
+            lb[0],
+            rt[0],
+            rb[0]
+        )
+
+        energy = blue_energy_layer(
+            max(x2-x,1),
+            energy_height
+        )
+
+        try:
+
+            frame[
+                y:y+energy_height,
+                x:x2
+            ] = energy
+
+        except:
+            pass
 
     cv2.imshow(
         "VisionX",
         frame
     )
 
-    key = cv2.waitKey(1) & 0xFF
-
-    if key == ord('1'):
-        mode = 1
-
-    elif key == ord('2'):
-        mode = 2
-
-    elif key == ord('3'):
-        mode = 3
-
-    elif key == ord('4'):
-        mode = 4
-
-    elif key == 27:
+    if cv2.waitKey(1) & 0xFF == 27:
         break
 
 cap.release()

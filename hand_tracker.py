@@ -8,12 +8,13 @@ class HandTracker:
         self.mp_hands = mp.solutions.hands
 
         self.hands = self.mp_hands.Hands(
+            static_image_mode=False,
             max_num_hands=2,
             min_detection_confidence=0.7,
             min_tracking_confidence=0.7
         )
 
-    def get_screen_points(self, frame):
+    def get_data(self, frame):
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -22,41 +23,55 @@ class HandTracker:
         if not results.multi_hand_landmarks:
             return None
 
-        if len(results.multi_hand_landmarks) < 2:
-            return None
+        h, w, _ = frame.shape
 
-        h,w,_ = frame.shape
-
-        hands_data = []
+        hands = []
 
         for hand in results.multi_hand_landmarks:
 
-            thumb = hand.landmark[4]
-            index = hand.landmark[8]
-            wrist = hand.landmark[0]
+            lm = hand.landmark
 
-            hands_data.append({
+            hands.append({
                 "thumb": (
-                    int(thumb.x*w),
-                    int(thumb.y*h)
+                    int(lm[4].x * w),
+                    int(lm[4].y * h)
                 ),
                 "index": (
-                    int(index.x*w),
-                    int(index.y*h)
+                    int(lm[8].x * w),
+                    int(lm[8].y * h)
                 ),
-                "wrist": (
-                    int(wrist.x*w),
-                    int(wrist.y*h)
-                )
+                "middle": (
+                    int(lm[12].x * w),
+                    int(lm[12].y * h)
+                ),
+                "ring": (
+                    int(lm[16].x * w),
+                    int(lm[16].y * h)
+                ),
+                "pinky": (
+                    int(lm[20].x * w),
+                    int(lm[20].y * h)
+                ),
+                "landmarks": lm
             })
 
-        left = hands_data[0]
-        right = hands_data[1]
+        return hands
 
-        lt = left["index"]
-        lb = left["thumb"]
+    def detect_mode(self, hand):
 
-        rt = right["index"]
-        rb = right["thumb"]
+        lm = hand["landmarks"]
 
-        return [lt, rt, rb, lb]
+        index_up = lm[8].y < lm[6].y
+        middle_up = lm[12].y < lm[10].y
+        ring_up = lm[16].y < lm[14].y
+
+        if index_up and not middle_up:
+            return 1
+
+        if middle_up and not ring_up:
+            return 2
+
+        if ring_up:
+            return 3
+
+        return 0
